@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36408.4 d17.14
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teedy.CL", "Teedy.CL\Teedy.CL.csproj", "{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teedy.CA", "Teedy.CA\Teedy.CA.csproj", "{3543C30C-084D-4028-9D8E-87882C2E5246}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3543C30C-084D-4028-9D8E-87882C2E5246}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3543C30C-084D-4028-9D8E-87882C2E5246}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3543C30C-084D-4028-9D8E-87882C2E5246}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3543C30C-084D-4028-9D8E-87882C2E5246}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {22FF755A-DCE0-4121-B80A-CA12B58C10F7}
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,24 @@
+{
+  "AllowedHosts": "*",
+  "Teedy": {
+    "Credentials": {
+      "URL": "https://demo.teedy.io",
+      "Username": "admin",
+      "Password": "admin"
+    },
+    "Actions": {
+      "Login": "/api/user/login",
+      "ListDocuments": "/api/document/list",
+      "AddFile": "/api/file",
+      "AddDocument": "/api/document",
+      "AttachFileToDocument": "/api/file",
+      "AddTag": "/api/tag"
+    },
+    "Headers": {
+      "Content-Type": "application/x-www-form-urlencoded"
+    }
+  },
+  "connectionDefualt": {
+    "connection": "Data Source=.;Initial Catalog=currex;User Id=sa;Password=root;Integrated Security=False;Encrypt=True;TrustServerCertificate=True;"
+  }
+}
