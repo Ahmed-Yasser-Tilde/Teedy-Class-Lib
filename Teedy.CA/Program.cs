@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Teedy.CL;
+using Teedy.CL.Services.TeedyServices;
 
 namespace Teedy.CA
 {
@@ -13,6 +13,7 @@ namespace Teedy.CA
                 .Build();
 
             string connectionString = configuration["connectionDefualt:connection"];
+            string teedyStorageFolderPath = configuration["TeedySettings:StorageFolder"];
 
             TeedyApiMethods apiMethods = new TeedyApiMethods(configuration);
 

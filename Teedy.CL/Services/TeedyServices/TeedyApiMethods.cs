@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 using Teedy.CL.Models.AlmesreyaModel;
 using Teedy.CL.Models.Tags;
 
-namespace Teedy.CL
+namespace Teedy.CL.Services.TeedyServices
 {
     public class TeedyApiMethods
     {
