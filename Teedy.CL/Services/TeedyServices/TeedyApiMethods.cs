@@ -158,102 +158,6 @@ namespace Teedy.CL.Services.TeedyServices
             }
         }
 
-        /// <summary>
-        /// Gets the MIME type based on file extension
-        /// </summary>
-        /// <param name="fileName">The file name with extension</param>
-        /// <returns>The appropriate MIME type</returns>
-        private static string GetMimeType(string fileName)
-        {
-            if (string.IsNullOrEmpty(fileName))
-                return "application/octet-stream";
-
-            string extension = Path.GetExtension(fileName).ToLowerInvariant();
-
-            switch (extension)
-            {
-                // Image formats
-                case ".jpg":
-                case ".jpeg":
-                    return "image/jpeg";
-                case ".png":
-                    return "image/png";
-                case ".gif":
-                    return "image/gif";
-                case ".bmp":
-                    return "image/bmp";
-                case ".tiff":
-                case ".tif":
-                    return "image/tiff";
-                case ".webp":
-                    return "image/webp";
-                case ".svg":
-                    return "image/svg+xml";
-                case ".ico":
-                    return "image/x-icon";
-
-                // Document formats
-                case ".pdf":
-                    return "application/pdf";
-                case ".doc":
-                    return "application/msword";
-                case ".docx":
-                    return "application/msword";
-                case ".xls":
-                    return "application/vnd.ms-excel";
-                case ".xlsx":
-                    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-                case ".ppt":
-                    return "application/vnd.ms-powerpoint";
-                case ".pptx":
-                    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
-
-                // Text formats
-                case ".txt":
-                    return "text/plain";
-                case ".csv":
-                    return "text/csv";
-                case ".html":
-                case ".htm":
-                    return "text/html";
-                case ".css":
-                    return "text/css";
-                case ".js":
-                    return "application/javascript";
-                case ".json":
-                    return "application/json";
-                case ".xml":
-                    return "application/xml";
-
-                // Archive formats
-                case ".zip":
-                    return "application/zip";
-                case ".rar":
-                    return "application/x-rar-compressed";
-                case ".7z":
-                    return "application/x-7z-compressed";
-                case ".tar":
-                    return "application/x-tar";
-                case ".gz":
-                    return "application/gzip";
-
-                // Audio/Video formats
-                case ".mp3":
-                    return "audio/mpeg";
-                case ".wav":
-                    return "audio/wav";
-                case ".mp4":
-                    return "video/mp4";
-                case ".avi":
-                    return "video/x-msvideo";
-                case ".mov":
-                    return "video/quicktime";
-
-                // Default fallback
-                default:
-                    return "application/octet-stream";
-            }
-        }
 
         /// <summary>
         /// 
@@ -386,11 +290,9 @@ namespace Teedy.CL.Services.TeedyServices
 
                 return false;
             }
-            catch (Exception ex)
+            catch 
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                throw ex;
-                return null;
+                throw;
             }
         }
 
@@ -756,5 +658,103 @@ namespace Teedy.CL.Services.TeedyServices
         }
 
         #endregion
+
+
+        /// <summary>
+        /// Gets the MIME type based on file extension
+        /// </summary>
+        /// <param name="fileName">The file name with extension</param>
+        /// <returns>The appropriate MIME type</returns>
+        private static string GetMimeType(string fileName)
+        {
+            if (string.IsNullOrEmpty(fileName))
+                return "application/octet-stream";
+
+            string extension = Path.GetExtension(fileName).ToLowerInvariant();
+
+            switch (extension)
+            {
+                // Image formats
+                case ".jpg":
+                case ".jpeg":
+                    return "image/jpeg";
+                case ".png":
+                    return "image/png";
+                case ".gif":
+                    return "image/gif";
+                case ".bmp":
+                    return "image/bmp";
+                case ".tiff":
+                case ".tif":
+                    return "image/tiff";
+                case ".webp":
+                    return "image/webp";
+                case ".svg":
+                    return "image/svg+xml";
+                case ".ico":
+                    return "image/x-icon";
+
+                // Document formats
+                case ".pdf":
+                    return "application/pdf";
+                case ".doc":
+                    return "application/msword";
+                case ".docx":
+                    return "application/msword";
+                case ".xls":
+                    return "application/vnd.ms-excel";
+                case ".xlsx":
+                    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+                case ".ppt":
+                    return "application/vnd.ms-powerpoint";
+                case ".pptx":
+                    return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+
+                // Text formats
+                case ".txt":
+                    return "text/plain";
+                case ".csv":
+                    return "text/csv";
+                case ".html":
+                case ".htm":
+                    return "text/html";
+                case ".css":
+                    return "text/css";
+                case ".js":
+                    return "application/javascript";
+                case ".json":
+                    return "application/json";
+                case ".xml":
+                    return "application/xml";
+
+                // Archive formats
+                case ".zip":
+                    return "application/zip";
+                case ".rar":
+                    return "application/x-rar-compressed";
+                case ".7z":
+                    return "application/x-7z-compressed";
+                case ".tar":
+                    return "application/x-tar";
+                case ".gz":
+                    return "application/gzip";
+
+                // Audio/Video formats
+                case ".mp3":
+                    return "audio/mpeg";
+                case ".wav":
+                    return "audio/wav";
+                case ".mp4":
+                    return "video/mp4";
+                case ".avi":
+                    return "video/x-msvideo";
+                case ".mov":
+                    return "video/quicktime";
+
+                // Default fallback
+                default:
+                    return "application/octet-stream";
+            }
+        }
     }
 }

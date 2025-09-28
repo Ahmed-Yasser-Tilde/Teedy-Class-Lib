@@ -9,6 +9,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Teedy.CL\Teedy.CL.csproj" />
+    <file Include="..\appsetting.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Topshelf" Version="4.3.0" />
   </ItemGroup>
 
 </Project>
