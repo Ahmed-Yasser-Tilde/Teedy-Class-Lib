@@ -1,37 +1,36 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using TeedyPackage.Models.AlmesreyaModel;
-using TeedyPackage.Models.Document;
-using TeedyPackage.Models.Tags;
-using TeedyPackage.Services.DatabaseService;
-using TeedyPackage.Services.TeedyServices;
+using TeedyService;
 using Topshelf;
 
-namespace TeedyService
+class Program
 {
-    public class Program
+    static void Main(string[] args)
     {
-        static void Main(string[] args)
+        var config = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .Build();
+
+        var language = config["ServiceConfig:Language"] ?? "en-US";
+        var mode = config["ServiceConfig:Mode"] ?? "Service";
+
+        Console.WriteLine($"Running in mode: {mode}, language: {language}");
+
+        HostFactory.Run(x =>
         {
-            MainService mainService = new MainService();
-            var rc = HostFactory.Run(x =>                                   //1
+            x.Service<MainService>(s =>
             {
-                x.Service<MainService>(s =>                                   //2
-                {
-                    s.ConstructUsing(name => mainService);                //3
-                    s.WhenStarted(tc => tc.Start());                         //4
-                    s.WhenStopped(tc => tc.Stop());                          //5
-                });
-                x.RunAsLocalSystem();                                       //6
+                s.ConstructUsing(_ => new MainService());
+                s.WhenStarted(tc => tc.Start());
+                s.WhenStopped(tc => tc.Stop());
+            });
 
-                x.SetDescription("uploud file ");                   //7
-                x.SetDisplayName("TeedyService");                                  //8
-                x.SetServiceName("TeedyService");                                  //9
-            });                                                             //10
+            x.RunAsLocalSystem();
 
-            var exitCode = (int)Convert.ChangeType(rc, rc.GetTypeCode());  //11
-            Environment.ExitCode = exitCode;
-
-        }
- }
+            x.SetDescription("upload file");
+            x.SetDisplayName("TeedyService");
+            x.SetServiceName("TeedyService");
+        });
+    }
 }

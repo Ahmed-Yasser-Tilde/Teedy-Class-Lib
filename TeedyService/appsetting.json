@@ -23,5 +23,11 @@
   },
   "TeedySettings": {
     "StorageFolder": "D:\\-14\\TeedyFiles"
-  }
+  },
+    "ServiceConfig": {
+      "Language": "en-US",
+      "Mode": "Service"
+    }
+  
+
 }

@@ -10,15 +10,16 @@ namespace TeedyService
     public class MainService
     {
         private IConfiguration _configuration;
-        private  CancellationTokenSource tokenSource;
+        private CancellationTokenSource tokenSource;
         private Task workerTask;
 
         public MainService()
         {
             _configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetCurrentDirectory())
-                .AddJsonFile("appsetting.json")
-                .Build(); ;
+                .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+            .AddEnvironmentVariables()
+            .Build();
         }
         public void Start()
         {
@@ -55,7 +56,7 @@ namespace TeedyService
                 {
                     // normal during shutdown
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     // TODO: log ex
                 }
@@ -67,8 +68,8 @@ namespace TeedyService
         //    // your real work
         //    return Task.CompletedTask;
         //}
-       
-     
+
+
         private Task SleepOneMinute(CancellationToken token)
         {
             return Task.Delay(TimeSpan.FromMinutes(1), token);
@@ -165,14 +166,14 @@ namespace TeedyService
                     throw new Exception("Error in Get Helper Data from Database");
                 }
 
-                List<string> tagsNamesFromAlmasryaForm =
-                [
+                List<string> tagsNamesFromAlmasryaForm = new List<string>()
+                {
                     $"({helperData.First().cb_br_id}){helperData.First().br_name.Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id}){helperData.First().cb_name.Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id})سنة{helperData.First().rec_date.Year.ToString().Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id})شهر{helperData.First().rec_date.Month.ToString().Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id})يوم{helperData.First().rec_date.Day.ToString().Trim().Replace(" ","_")}"
-                ];
+                };
                 #endregion
 
                 #region Handle Create Or Modify Document In Teedy
@@ -215,7 +216,7 @@ namespace TeedyService
         {
             try
             {
-                List<string> uploadedFilesId = [];
+                List<string> uploadedFilesId = new List<string>();
                 bool isSucessAttachFiles = true;
                 foreach (string filePath in filesPath)
                 {
