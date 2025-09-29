@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36408.4 d17.14
+VisualStudioVersion = 17.14.36408.4
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teedy.CL", "Teedy.CL\Teedy.CL.csproj", "{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeedyPackage", "TeedyPackage\TeedyPackage.csproj", "{E23B05E6-1CC5-46BC-B6E7-A05D3E3DBCF5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Teedy.CA", "Teedy.CA\Teedy.CA.csproj", "{3543C30C-084D-4028-9D8E-87882C2E5246}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeedyService", "TeedyService\TeedyService.csproj", "{3543C30C-084D-4028-9D8E-87882C2E5246}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
