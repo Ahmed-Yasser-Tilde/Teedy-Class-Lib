@@ -157,7 +157,7 @@ namespace TeedyService
                 {
                     $"({helperData.First().cb_br_id}){helperData.First().br_name.Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id}){helperData.First().cb_name.Trim().Replace(" ","_")}",
-                    $"({helperData.First().cb_id}){helperData.First().rec_date.ToString("yyyyy-mm-dd").Trim().Replace(" ","_")}"
+                    $"({helperData.First().cb_id})({helperData.First().rec_date.ToString("yyyy-MM-dd").Trim().Replace(" ","_")})"
                 };
                 #endregion
 
