@@ -157,7 +157,7 @@ namespace TeedyService
                 #endregion
 
                 #region Prepare Tags Names from Almasrya Form
-                IEnumerable<HelperData> helperData = dbHelper.Query<HelperData>("select cb.cb_br_id, cb.cb_name, br.br_name, r.rec_date, r.rec_document_id\r\n" +
+                IEnumerable<HelperData> helperData = dbHelper.Query<HelperData>("select cb.cb_id, cb.cb_br_id, cb.cb_name, br.br_name, r.rec_date, r.rec_document_id\r\n" +
                                 "from receipts as r\r\njoin cashboxes as cb on r.rec_from_cb_id = cb.cb_id\r\n" +
                                 "join branch as br on cb.cb_br_id = br.br_id\r\nwhere rec_id = @RecId;", new { RecId = rec_id });
 
@@ -170,9 +170,7 @@ namespace TeedyService
                 {
                     $"({helperData.First().cb_br_id}){helperData.First().br_name.Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_br_id}){helperData.First().cb_name.Trim().Replace(" ","_")}",
-                    $"({helperData.First().cb_br_id})سنة{helperData.First().rec_date.Year.ToString().Trim().Replace(" ","_")}",
-                    $"({helperData.First().cb_br_id})شهر{helperData.First().rec_date.Month.ToString().Trim().Replace(" ","_")}",
-                    $"({helperData.First().cb_br_id})يوم{helperData.First().rec_date.Day.ToString().Trim().Replace(" ","_")}"
+                    $"({helperData.First().cb_id}){helperData.First().rec_date.ToString("yyyyy-mm-dd").Trim().Replace(" ","_")}"
                 };
                 #endregion
 

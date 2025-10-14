@@ -22,7 +22,7 @@
     "connection": "Data Source=.;Initial Catalog=currex;User Id=sa;Password=root;Integrated Security=False;Encrypt=True;TrustServerCertificate=True;"
   },
   "TeedySettings": {
-    "StorageFolder": "D:\\-14\\TeedyFiles"
+    "StorageFolder": "D:\\Teedy"
   },
     "ServiceConfig": {
       "Language": "en-US",
