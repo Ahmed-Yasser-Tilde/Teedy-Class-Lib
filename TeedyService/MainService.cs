@@ -63,18 +63,6 @@ namespace TeedyService
             }
         }
 
-        //private Task StartTeedyService()
-        //{
-        //    // your real work
-        //    return Task.CompletedTask;
-        //}
-
-
-        private Task SleepOneMinute(CancellationToken token)
-        {
-            return Task.Delay(TimeSpan.FromMinutes(1), token);
-        }
-
         public async Task StartTeedyService()
         {
             string teedyStorageFolderPath = _configuration["TeedySettings:StorageFolder"];
@@ -134,11 +122,10 @@ namespace TeedyService
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                LogError("Function: StartTeedyService" + ex.Message);
+                //Console.WriteLine(ex.Message);
             }
         }
-
-
 
         public static async Task<bool> UploadDocumentsToTeedy(IConfiguration configuration, List<string> filesPath, string rec_id, string receiptJsonFileContent)
         {
@@ -204,8 +191,9 @@ namespace TeedyService
 
                 #endregion
             }
-            catch
+            catch (Exception ex)
             {
+                LogError($"Function: UploadDocumentsToTeedy , rec_id = {rec_id}" + ex.Message);
                 throw;
             }
         }
@@ -234,8 +222,9 @@ namespace TeedyService
                 else
                     return uploadedFilesId;
             }
-            catch
+            catch (Exception ex)
             {
+                LogError("Function: AddFilesToExistingDocument" + ex.Message);
                 throw;
             }
         }
@@ -355,6 +344,34 @@ namespace TeedyService
             {
                 return null;
             }
+        }
+
+        public static void LogError(string errorData)
+        {
+            string logFile = AppContext.BaseDirectory + "teedy.log";
+
+            FileInfo file = new FileInfo(logFile);
+            if (file.Exists)
+            {
+                if (file.Length > 1024 * 1024)
+                {
+                    try
+                    {
+                        file.Delete();
+                    }
+                    catch
+                    {
+
+                    }
+                } 
+            }
+
+            try
+            {
+                File.AppendAllText(logFile, DateTime.Now + ": " + errorData + Environment.NewLine + Environment.NewLine);
+            }
+            catch
+            { }
         }
 
     }
