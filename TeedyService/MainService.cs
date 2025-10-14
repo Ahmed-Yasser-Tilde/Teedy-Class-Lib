@@ -2,6 +2,7 @@
 using TeedyPackage.Models.AlmesreyaModel;
 using TeedyPackage.Models.Document;
 using TeedyPackage.Models.Tags;
+using TeedyPackage.Services;
 using TeedyPackage.Services.DatabaseService;
 using TeedyPackage.Services.TeedyServices;
 
@@ -90,9 +91,10 @@ namespace TeedyService
                         string receiptJsonFilePath = filesPath.FirstOrDefault(filePath => Path.GetExtension(filePath).TrimStart('.').ToLower().Equals("json", StringComparison.OrdinalIgnoreCase)) ?? Path.Combine(subFolderPath, "receipt.json");
                         if (!File.Exists(receiptJsonFilePath))
                         {
-                            Console.WriteLine($"Recepit file not found for Folder: {rec_id}");
+                            LogService.LogInfo($"Recepit file not found for Folder: {rec_id}");
                             continue;
                         }
+
                         string receiptJsonFileContent = File.ReadAllText(receiptJsonFilePath);
 
                         var filesPathToBeUploaded = filesPath.Where((filePath) =>
@@ -101,17 +103,19 @@ namespace TeedyService
                             return !ext.Equals("json", StringComparison.OrdinalIgnoreCase) && !ext.Equals("txt", StringComparison.OrdinalIgnoreCase) && !uploadedFiles.Contains(filePath);
                         }).ToList();
 
+                        LogService.LogInfo("Files to be uploaded: " + string.Join(", ", filesPathToBeUploaded) + " for rec_id: " + rec_id);
+
                         bool isSucess = await UploadDocumentsToTeedy(_configuration, filesPathToBeUploaded, rec_id, receiptJsonFileContent);
 
                         if (!isSucess)
                         {
-                            Console.WriteLine($"Error in Upload Documents to Teedy for Folder: {rec_id}");
+                            LogService.LogInfo($"Error in Upload Documents to Teedy for Folder: {rec_id}");
                         }
                         else
                         {
                             string metaDataFileNewContent = string.Join(Environment.NewLine, filesPath);
                             File.WriteAllText(metaDataFilePath, metaDataFileNewContent);
-                            Console.WriteLine($"Success in Upload Documents to Teedy for Folder: {rec_id}");
+                            LogService.LogInfo($"Success in Upload Documents to Teedy for Folder: {rec_id}");
                         }
                     }
                 }
@@ -122,8 +126,7 @@ namespace TeedyService
             }
             catch (Exception ex)
             {
-                LogError("Function: StartTeedyService" + ex.Message);
-                //Console.WriteLine(ex.Message);
+                LogService.LogError("Function: StartTeedyService" + ex.Message);
             }
         }
 
@@ -141,6 +144,7 @@ namespace TeedyService
                 {
                     return false;
                 }
+                LogService.LogInfo("Authntication to Teedy is done successfully.");
                 #endregion
 
                 #region Prepare Tags Names from Almasrya Form
@@ -159,6 +163,8 @@ namespace TeedyService
                     $"({helperData.First().cb_br_id}){helperData.First().cb_name.Trim().Replace(" ","_")}",
                     $"({helperData.First().cb_id})({helperData.First().rec_date.ToString("yyyy-MM-dd").Trim().Replace(" ","_")})"
                 };
+
+                LogService.LogInfo("Tags Names from Almasrya Form: " + string.Join(" -> ", tagsNamesFromAlmasryaForm));
                 #endregion
 
                 #region Handle Create Or Modify Document In Teedy
@@ -170,6 +176,7 @@ namespace TeedyService
                     {
                         throw new Exception("Error in Add Files to Existing Document");
                     }
+                    LogService.LogInfo("Handle Modify Document In Teedy is done successfully.");
                     return true;
                 }
                 else
@@ -184,16 +191,17 @@ namespace TeedyService
                         {
                             throw new Exception("Error in Update rec_document_id in receipts table");
                         }
+                        LogService.LogInfo("Handle Create Document And Attach Files In Teedy is done successfully.");
                         return true;
                     }
                     throw new Exception("Error in Create New Document And Attach Files");
                 }
-
+                
                 #endregion
             }
             catch (Exception ex)
             {
-                LogError($"Function: UploadDocumentsToTeedy , rec_id = {rec_id}" + ex.Message);
+                LogService.LogError($"Function: UploadDocumentsToTeedy , rec_id = {rec_id}" + ex.Message);
                 throw;
             }
         }
@@ -202,14 +210,17 @@ namespace TeedyService
         {
             try
             {
+                LogService.LogInfo($"Start Add Files to Existing Document: {rec_document_id} in Teedy.");
                 List<string> uploadedFilesId = new List<string>();
                 bool isSucessAttachFiles = true;
                 foreach (string filePath in filesPath)
                 {
                     string fileId = await TeedyApiMethods.PutFile(filePath, authToken);
+                    LogService.LogInfo("Uploaded File Path: " + filePath);
                     uploadedFilesId.Add(fileId);
 
                     bool? isSucess = await TeedyApiMethods.AttachFileToDoc(fileId, rec_document_id, authToken);
+                    LogService.LogInfo($"Attach File Path: {filePath} to Document Id: " + rec_document_id);
                     if (!isSucess.GetValueOrDefault())
                     {
                         isSucessAttachFiles = false;
@@ -224,7 +235,7 @@ namespace TeedyService
             }
             catch (Exception ex)
             {
-                LogError("Function: AddFilesToExistingDocument" + ex.Message);
+                LogService.LogError("Function: AddFilesToExistingDocument : " + ex.Message);
                 throw;
             }
         }
@@ -238,6 +249,7 @@ namespace TeedyService
                 {
                     return new AddDocumentWithFilesResponse { IsSuccess = false, DocumentId = string.Empty, FileIds = new List<string>() };
                 }
+                LogService.LogInfo("Handle Create Tages is done successfully.");
 
                 Document document = new Document
                 {
@@ -250,8 +262,9 @@ namespace TeedyService
                 AddDocumentWithFilesResponse addDocumentWithFiles = await TeedyApiMethods.AddFilesToDocument(document, filesPath, authToken);
                 return addDocumentWithFiles;
             }
-            catch
+            catch(Exception ex)
             {
+                LogService.LogError("Function: CreateNewDocumentAndAttachFiles : " + ex.Message);
                 return new AddDocumentWithFilesResponse { IsSuccess = false, DocumentId = string.Empty, FileIds = new List<string>() };
             }
         }
@@ -346,33 +359,6 @@ namespace TeedyService
             }
         }
 
-        public static void LogError(string errorData)
-        {
-            string logFile = AppContext.BaseDirectory + "teedy.log";
-
-            FileInfo file = new FileInfo(logFile);
-            if (file.Exists)
-            {
-                if (file.Length > 1024 * 1024)
-                {
-                    try
-                    {
-                        file.Delete();
-                    }
-                    catch
-                    {
-
-                    }
-                } 
-            }
-
-            try
-            {
-                File.AppendAllText(logFile, DateTime.Now + ": " + errorData + Environment.NewLine + Environment.NewLine);
-            }
-            catch
-            { }
-        }
 
     }
 }

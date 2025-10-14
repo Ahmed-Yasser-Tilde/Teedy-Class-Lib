@@ -219,16 +219,15 @@ namespace TeedyPackage.Services.TeedyServices
                     }
                     catch
                     {
-                        return _restResponse.Content; // If parsing fails, return raw response
+                        throw new Exception(_restResponse.Content); // If parsing fails, return raw response
                     }
                 }
 
                 return _restResponse.Content?.ToString();
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                return null;
+                throw;
             }
         }
 
@@ -279,20 +278,20 @@ namespace TeedyPackage.Services.TeedyServices
                             return true;
                         }
 
-                        return false;
+                        throw new Exception($"Failed to attach file : {fileId} to document : {docId}. Status: {status}");
 
                     }
-                    catch
+                    catch(Exception ex)
                     {
-                        return false;
+                        throw new Exception($"Failed to attach file : {fileId} to document : {docId}." + ex.Message);
                     }
                 }
 
-                return false;
+                throw new Exception($"Failed to attach file : {fileId} to document : {docId}.");
             }
-            catch 
+            catch(Exception ex)
             {
-                throw;
+                throw new Exception($"Failed to attach file : {fileId} to document : {docId}." + ex.Message);
             }
         }
 
@@ -316,7 +315,7 @@ namespace TeedyPackage.Services.TeedyServices
                         IsSuccess = false
                     };
 
-
+                LogService.LogInfo($"Document created with ID: {docId}");
                 // Step 2: Initialize a list to hold file IDs
                 List<string> FileIds = new List<string>();
 
@@ -326,11 +325,11 @@ namespace TeedyPackage.Services.TeedyServices
                 {
                     var fileId = await PutFile(filePath, authToken);
                     if (string.IsNullOrEmpty(fileId))
-                        return new AddDocumentWithFilesResponse
-                        {
-                            IsSuccess = false
-                        };
+                    {
+                        throw new Exception($"Failed to upload file: {filePath}");
+                    }
                     FileIds.Add(fileId);
+                    LogService.LogInfo($"File uploaded with ID: {fileId}");
                 }
 
                 // Step 4: Loop through the FileIds and attach each file to the document
@@ -338,7 +337,8 @@ namespace TeedyPackage.Services.TeedyServices
                 {
                     var attachmentResult = await AttachFileToDoc(fileId, docId, authToken);
                     if (!attachmentResult.HasValue || !attachmentResult.Value)
-                        return new AddDocumentWithFilesResponse { IsSuccess = false };
+                        throw new Exception($"Failed to attach file ID: {fileId} to document ID: {docId}");
+                    LogService.LogInfo($"File ID: {fileId} attached to Document ID: {docId}");
                 }
                 // Step 5: Return true if all files are successfully attached to the document
                 return new AddDocumentWithFilesResponse
@@ -349,12 +349,9 @@ namespace TeedyPackage.Services.TeedyServices
                 };
             }
 
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"Error: {ex.Message}");
-                //ClsGlobal.LogError(ex);
-                //ClsGlobal.LogError($"Error: {ex.Message}", "TeedyApiMethod");
-                return new AddDocumentWithFilesResponse { IsSuccess = false }; // Return false in case of an exception
+                throw;
             }
 
         }
