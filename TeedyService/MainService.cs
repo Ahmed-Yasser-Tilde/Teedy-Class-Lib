@@ -117,6 +117,8 @@ namespace TeedyService
                             File.WriteAllText(metaDataFilePath, metaDataFileNewContent);
                             LogService.LogInfo($"Success in Upload Documents to Teedy for Folder: {rec_id}");
                         }
+
+                        Thread.Sleep(20000);
                     }
                 }
                 else
@@ -253,10 +255,13 @@ namespace TeedyService
 
                 Document document = new Document
                 {
-                    Title = $"رقم الحركة :{rec_id} ",
-                    Language = "eng",
-                    Description = receiptJson,
-                    Tags = tagsId,
+                    title = $"رقم الحركة :{rec_id} ",
+                    language = "eng",
+                    description = receiptJson,
+                    tags = tagsId.Select(t => new Tag
+                    {
+                        Id = t
+                    }).ToList(),
                 };
 
                 AddDocumentWithFilesResponse addDocumentWithFiles = await TeedyApiMethods.AddFilesToDocument(document, filesPath, authToken);

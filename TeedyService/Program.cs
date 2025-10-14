@@ -14,23 +14,35 @@ class Program
 
         var language = config["ServiceConfig:Language"] ?? "en-US";
         var mode = config["ServiceConfig:Mode"] ?? "Service";
-
-        Console.WriteLine($"Running in mode: {mode}, language: {language}");
+        string workingService = config["TeedySettings:WorkingService"];
 
         HostFactory.Run(x =>
         {
-            x.Service<MainService>(s =>
+            
+            if(workingService == nameof(MainService))
             {
-                s.ConstructUsing(_ => new MainService());
-                s.WhenStarted(tc => tc.Start());
-                s.WhenStopped(tc => tc.Stop());
-            });
+                x.Service<MainService>(s =>
+                {
+                    s.ConstructUsing(_ => new MainService());
+                    s.WhenStarted(tc => tc.Start());
+                    s.WhenStopped(tc => tc.Stop());
+                });
+            }
+            else
+            {
+                x.Service<DeleteService>(s =>
+                {
+                    s.ConstructUsing(_ => new DeleteService());
+                    s.WhenStarted(tc => tc.Start());
+                    s.WhenStopped(tc => tc.Stop());
+                });
 
+            }
             x.RunAsLocalSystem();
-
             x.SetDescription("upload file");
-            x.SetDisplayName("TeedyService");
-            x.SetServiceName("TeedyService");
+            x.SetDisplayName("TeedyServiceTemp");
+            x.SetServiceName("TeedyServiceTemp");
+
         });
     }
 }

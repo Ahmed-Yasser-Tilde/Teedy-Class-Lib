@@ -2,7 +2,7 @@
 {
     public class File
     {
-        public string ID { get; set; }
+        public string id { get; set; }
         public string FileName { get; set; }
         public string Processing { get; set; }
         public string Size { get; set; }

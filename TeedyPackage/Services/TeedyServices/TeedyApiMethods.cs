@@ -4,6 +4,8 @@ using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using TeedyPackage.Models.AlmesreyaModel;
+using TeedyPackage.Models.Document;
+using TeedyPackage.Models.Files;
 using TeedyPackage.Models.Tags;
 
 namespace TeedyPackage.Services.TeedyServices
@@ -96,7 +98,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <exception cref="ApplicationException">Thrown when an error occurs during the upload process</exception>
         public static async Task<string> PutFile(string filePath, string authToken)
         {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
             {
                 throw new ArgumentException("File path is invalid or file does not exist.");
             }
@@ -108,7 +110,7 @@ namespace TeedyPackage.Services.TeedyServices
 
             try
             {
-                byte[] fileData = File.ReadAllBytes(filePath);
+                byte[] fileData = System.IO.File.ReadAllBytes(filePath);
                 string originalFileName = Path.GetFileName(filePath);
                 string encodedFileName = Uri.EscapeDataString(originalFileName);
                 string contentType = GetMimeType(originalFileName);
@@ -172,7 +174,7 @@ namespace TeedyPackage.Services.TeedyServices
             {
 
                 // Validate required fields: Title and Language 'other optional'
-                if (document == null || string.IsNullOrEmpty(document.Title) || string.IsNullOrEmpty(document.Language))
+                if (document == null || string.IsNullOrEmpty(document.title) || string.IsNullOrEmpty(document.language))
                 {
                     throw new ArgumentException("Document title and language are required.");
                 }
@@ -191,18 +193,18 @@ namespace TeedyPackage.Services.TeedyServices
                 _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
 
                 // Add required fields (Title and Language)
-                _restRequest.AddParameter("title", document.Title);
-                _restRequest.AddParameter("language", document.Language);
+                _restRequest.AddParameter("title", document.title);
+                _restRequest.AddParameter("language", document.language);
 
-                foreach (var tag in document.Tags)
+                foreach (var tag in document.tags)
                 {
-                    if (!string.IsNullOrEmpty(tag))
+                    if (!string.IsNullOrEmpty(tag.Id))
                     {
-                        _restRequest.AddParameter("tags", tag);
+                        _restRequest.AddParameter("tags", tag.Id);
                     }
                 }
                 ;
-                _restRequest.AddParameter("description", document.Description);
+                _restRequest.AddParameter("description", document.description);
 
                 // Execute the request
                 RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
@@ -398,6 +400,163 @@ namespace TeedyPackage.Services.TeedyServices
             }
         }
 
+        public static async Task<GetAllDocumentsResponse> GetDocuments(string authToken, int limit, int offset)
+        {
+            try
+            {
+                int numOfDays = int.Parse(_configuration["TeedySettings:DeleteCondition"]);
+                string _baseUrl = _configuration["Teedy:Credentials:URL"];
+                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
+                RestRequest _restRequest = new RestRequest($"/api/document/list", Method.Get);
+
+                _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
+                _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
+
+                _restRequest.AddParameter("limit", limit);
+                _restRequest.AddParameter("offset", offset);
+                _restRequest.AddParameter("search", $"after:{DateTime.Today.AddDays(-1 * numOfDays):yyyy-MM-dd}");
+                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+
+
+                if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
+                {
+                    try
+                    {
+                        GetAllDocumentsResponse jsonResponse = JsonSerializer.Deserialize<GetAllDocumentsResponse>(_restResponse.Content);
+                        return jsonResponse; // If parsing is successful, return true
+                    }
+                    catch
+                    {
+                        LogService.LogError("Failed to retrieve documents. " + _restResponse.ErrorMessage + _restResponse.Content);
+                        throw new Exception("Failed to retrieve documents. " + _restResponse.ErrorMessage + _restResponse.Content);
+                    }
+                }
+                else
+                {
+                    throw new Exception("Failed to retrieve documents. " + _restResponse.ErrorMessage + _restResponse.Content);
+                }
+            }
+            catch (Exception ex)
+            {
+                LogService.LogError("Failed to retrieve documents. " + ex.Message);
+                throw new Exception("Failed to retrieve documents. " + ex.Message);
+            }
+        }
+
+        public static async Task<bool> DeleteDocument(string authToken, string documentId)
+        {
+            try
+            {
+                string _baseUrl = _configuration["Teedy:Credentials:URL"];
+                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
+                RestRequest _restRequest = new RestRequest($"/api/document/{documentId}", Method.Delete);
+                _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
+                _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
+                _restRequest.AddParameter("id", documentId);
+                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+
+                if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
+                {
+                    try
+                    {
+                        JsonElement jsonResponse = JsonSerializer.Deserialize<JsonElement>(_restResponse.Content);
+                        string status = jsonResponse.GetProperty("status").GetString();
+                        if (status.ToLower() == "ok")
+                        {
+                            return true;
+                        }
+                        return false;
+                    }
+                    catch
+                    {
+                        throw;
+                    }
+                }
+                else
+                {
+                    LogService.LogError("Failed to delete documents. " + _restResponse.ErrorMessage);
+                    throw new Exception("Failed to delete documents. " + _restResponse.ErrorMessage);
+                }
+
+            }
+            catch
+            {
+                LogService.LogError("Failed to delete documents. " + documentId);
+                throw;
+            }
+        }
+        
+        public static async Task<GetFiles> GetDocumentFiles(string authToken, string documentId)
+        {
+            string _baseUrl = _configuration["Teedy:Credentials:URL"];
+            RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
+            RestRequest _restRequest = new RestRequest($"/api/file/list", Method.Get);
+            _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
+            _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
+            _restRequest.AddParameter("id", documentId);
+            RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+            if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
+            {
+                try
+                {
+                    GetFiles jsonResponse = JsonSerializer.Deserialize<GetFiles>(_restResponse.Content);
+                    return jsonResponse; // If parsing is successful, return true
+                }
+                catch
+                {
+                    LogService.LogError("Failed to retrieve document files. " + _restResponse.ErrorMessage + _restResponse.Content);
+                    throw new Exception("Failed to retrieve document files. " + _restResponse.ErrorMessage + _restResponse.Content);
+                }
+            }
+            else
+            {
+                LogService.LogError("Failed to retrieve document files. " + _restResponse.ErrorMessage + _restResponse.Content);
+                throw new Exception("Failed to retrieve document files. " + _restResponse.ErrorMessage + _restResponse.Content);
+            }
+        }
+
+        public static async Task<bool> DeleteFile(string authToken, string fileId)
+        {
+            try
+            {
+                string _baseUrl = _configuration["Teedy:Credentials:URL"];
+                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
+                RestRequest _restRequest = new RestRequest($"/api/file/{fileId}", Method.Delete);
+                _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
+                _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
+                _restRequest.AddParameter("id", fileId);
+                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+
+                if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
+                {
+                    try
+                    {
+                        JsonElement jsonResponse = JsonSerializer.Deserialize<JsonElement>(_restResponse.Content);
+                        string status = jsonResponse.GetProperty("status").GetString();
+                        if (status.ToLower() == "ok")
+                        {
+                            return true;
+                        }
+                        return false;
+                    }
+                    catch
+                    {
+                        throw;
+                    }
+                }
+                else
+                {
+                    LogService.LogError("Failed to delete file. " + _restResponse.ErrorMessage);
+                    throw new Exception("Failed to delete file. " + _restResponse.ErrorMessage);
+                }
+
+            }
+            catch
+            {
+                LogService.LogError("Failed to delete file. " + fileId);
+                throw;
+            }
+        }
         #endregion
 
         #region Tags
@@ -654,6 +813,50 @@ namespace TeedyPackage.Services.TeedyServices
             }
         }
 
+
+        public static async Task<bool> DeleteTag(string authToken, string tagId)
+        {
+            try
+            {
+
+                string _baseUrl = _configuration["Teedy:Credentials:URL"];
+                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
+                RestRequest _restRequest = new RestRequest($"/api/tag/{tagId}", Method.Delete);
+
+                _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
+                _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
+
+                _restRequest.AddParameter("id", tagId);
+                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+
+
+                if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
+                {
+                    try
+                    {
+                        JsonElement jsonResponse = JsonSerializer.Deserialize<JsonElement>(_restResponse.Content);
+                        string status = jsonResponse.GetProperty("status").GetString();
+                        if (status.ToLower() == "ok")
+                        {
+                            return true;
+                        }
+                        return false;
+                    }
+                    catch
+                    {
+                        throw;
+                    }
+                }
+                else
+                {
+                    throw new Exception("Failed to delete tag. " + _restResponse.ErrorMessage);
+                }
+            }
+            catch
+            {
+                throw;
+            }
+        }
         #endregion
 
 

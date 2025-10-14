@@ -2,6 +2,6 @@
 {
     public class GetFiles
     {
-        public List<File> Files { get; set; }
+        public List<File> files { get; set; }
     }
 }
