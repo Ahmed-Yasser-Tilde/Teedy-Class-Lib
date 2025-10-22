@@ -1,5 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Polly;
+using Polly.Retry;
 using RestSharp;
+using System.Net;
 using System.Security.Authentication;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -12,7 +15,10 @@ namespace TeedyPackage.Services.TeedyServices
 {
     public class TeedyApiMethods
     {
-        private static IConfiguration _configuration;
+        private readonly IConfiguration _configuration;
+        private readonly AsyncRetryPolicy<RestResponse> _retryPolicy;
+
+        private readonly RestClient _client;
 
         /// <summary>
         /// 
@@ -21,6 +27,40 @@ namespace TeedyPackage.Services.TeedyServices
         public TeedyApiMethods(IConfiguration configuration)
         {
             _configuration = configuration;
+            var baseUrl = _configuration["Teedy:Credentials:URL"];
+
+
+            var options = new RestClientOptions(baseUrl)
+            {
+                ThrowOnAnyError = false,
+                Encoding = System.Text.Encoding.UTF8,
+                Timeout = TimeSpan.FromSeconds(40) // 40 seconds
+            };
+
+            _client = new RestClient(options);
+
+            // ✅ Define retry policy
+            _retryPolicy = Policy
+                .HandleResult<RestResponse>(r =>
+                    r.StatusCode == HttpStatusCode.RequestTimeout ||
+                    r.StatusCode == HttpStatusCode.BadGateway ||
+                    r.StatusCode == HttpStatusCode.ServiceUnavailable ||
+                    r.StatusCode == HttpStatusCode.GatewayTimeout ||
+                    !r.IsSuccessful)
+                .Or<TimeoutException>()
+                .Or<HttpRequestException>()
+                .WaitAndRetryAsync(
+                    retryCount: 3,
+                    sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)), // 2s, 4s, 8s
+                    onRetry: (outcome, delay, attempt, context) =>
+                    {
+                        //_logger.LogWarning(
+                        //    "Retry {Attempt} after {Delay}s due to {Reason}",
+                        //    attempt,
+                        //    delay.TotalSeconds,
+                        //    outcome.Exception?.Message ?? outcome.Result?.StatusDescription
+                        //);
+                    });
         }
 
 
@@ -34,7 +74,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="AuthenticationException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public static async Task<string> Login(string username, string password)
+        public async Task<string> Login(string username, string password)
         {
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
@@ -42,11 +82,6 @@ namespace TeedyPackage.Services.TeedyServices
             }
             try
             {
-
-                var _baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
-
                 var enpoindurl = _configuration["Teedy:Actions:Login"];
                 RestRequest _restRequest = new RestRequest(enpoindurl, Method.Post);
 
@@ -59,7 +94,7 @@ namespace TeedyPackage.Services.TeedyServices
 
 
                 // Execution
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
 
                 // With this corrected code:
@@ -79,7 +114,6 @@ namespace TeedyPackage.Services.TeedyServices
             catch (Exception e)
             {
                 // Log any other errors and throw them
-                Console.WriteLine($"Error: {e.ToString()}");
                 throw new ApplicationException("An error occurred during the login process.", e);
             }
 
@@ -96,7 +130,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <returns>The file ID from the response, or the raw response content if parsing fails</returns>
         /// <exception cref="ArgumentException">Thrown when file path is invalid or file does not exist</exception>
         /// <exception cref="ApplicationException">Thrown when an error occurs during the upload process</exception>
-        public static async Task<string> PutFile(string filePath, string authToken)
+        public async Task<string> PutFile(string filePath, string authToken)
         {
             if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath))
             {
@@ -115,16 +149,9 @@ namespace TeedyPackage.Services.TeedyServices
                 string encodedFileName = Uri.EscapeDataString(originalFileName);
                 string contentType = GetMimeType(originalFileName);
 
-                string baseUrl = _configuration["Teedy:Credentials:URL"];
                 string addFileEndpoint = _configuration["Teedy:Actions:AddFile"];
                 string cleanEndpoint = addFileEndpoint.Split('?')[0];
 
-                RestClientOptions options = new RestClientOptions(baseUrl)
-                {
-                    Encoding = System.Text.Encoding.UTF8
-                };
-
-                RestClient restClient = new RestClient(options);
                 RestRequest restRequest = new RestRequest(addFileEndpoint, Method.Put);
 
                 restRequest.AddQueryParameter("auth_token", authToken);
@@ -133,7 +160,7 @@ namespace TeedyPackage.Services.TeedyServices
                 restRequest.AddFile("file", fileData, encodedFileName, contentType);
                 restRequest.AddHeader("Accept", "application/json");
 
-                RestResponse restResponse = await restClient.ExecuteAsync(restRequest);
+                RestResponse restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(restRequest));
 
                 if (restResponse.IsSuccessful && !string.IsNullOrEmpty(restResponse.Content))
                 {
@@ -168,7 +195,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <param name="authToken"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
-        public static async Task<string> AddDocument(Models.Document.Document document, string authToken)
+        public async Task<string> AddDocument(Models.Document.Document document, string authToken)
         {
             try
             {
@@ -178,12 +205,6 @@ namespace TeedyPackage.Services.TeedyServices
                 {
                     throw new ArgumentException("Document title and language are required.");
                 }
-
-                // Set the base URL
-                var _baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                // Initialize RestClient
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
 
                 // Create the RestRequest for the PUT method
                 RestRequest _restRequest = new RestRequest("/api/document", Method.Put);
@@ -207,7 +228,7 @@ namespace TeedyPackage.Services.TeedyServices
                 _restRequest.AddParameter("description", document.description);
 
                 // Execute the request
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
                 {
@@ -240,15 +261,13 @@ namespace TeedyPackage.Services.TeedyServices
         /// <param name="docId"></param>
         /// <param name="authToken"></param>
         /// <returns></returns>
-        public static async Task<bool?> AttachFileToDoc(string fileId, string docId, string authToken)
+        public async Task<bool?> AttachFileToDoc(string fileId, string docId, string authToken)
         {
             try
             {
 
                 var _baseUrl = _configuration["Teedy:Credentials:URL"];
 
-                // Initialize RestClient with base URL
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
 
                 // Build the endpoint URL for file attachment
                 RestRequest _restRequest = new RestRequest($"/api/file/{fileId}/attach", Method.Post);
@@ -261,7 +280,7 @@ namespace TeedyPackage.Services.TeedyServices
                 _restRequest.AddParameter("id", docId);
 
                 // Execute the request
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
@@ -283,7 +302,7 @@ namespace TeedyPackage.Services.TeedyServices
                         throw new Exception($"Failed to attach file : {fileId} to document : {docId}. Status: {status}");
 
                     }
-                    catch(Exception ex)
+                    catch (Exception ex)
                     {
                         throw new Exception($"Failed to attach file : {fileId} to document : {docId}." + ex.Message);
                     }
@@ -291,7 +310,7 @@ namespace TeedyPackage.Services.TeedyServices
 
                 throw new Exception($"Failed to attach file : {fileId} to document : {docId}.");
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
                 throw new Exception($"Failed to attach file : {fileId} to document : {docId}." + ex.Message);
             }
@@ -304,7 +323,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <param name="filePaths"></param>
         /// <param name="authToken"></param>
         /// <returns></returns>
-        public static async Task<AddDocumentWithFilesResponse> AddFilesToDocument
+        public async Task<AddDocumentWithFilesResponse> AddFilesToDocument
             (Models.Document.Document document, List<string> filePaths, string authToken)
         {
             try
@@ -358,7 +377,7 @@ namespace TeedyPackage.Services.TeedyServices
 
         }
 
-        public static async Task<bool> GetDocument(string documentId, string authToken)
+        public async Task<bool> GetDocument(string documentId, string authToken)
         {
             try
             {
@@ -368,11 +387,6 @@ namespace TeedyPackage.Services.TeedyServices
                     throw new ArgumentException("Document id is required.");
                 }
 
-                // Set the base URL
-                var _baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                // Initialize RestClient
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
 
                 // Create the RestRequest for the PUT method
                 RestRequest _restRequest = new RestRequest($"/api/document/{documentId}", Method.Get);
@@ -385,7 +399,7 @@ namespace TeedyPackage.Services.TeedyServices
                 //_restRequest.AddParameter("id", documentId);
 
                 // Execute the request
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
                 {
@@ -400,13 +414,11 @@ namespace TeedyPackage.Services.TeedyServices
             }
         }
 
-        public static async Task<GetAllDocumentsResponse> GetDocuments(string authToken, int limit, int offset)
+        public  async Task<GetAllDocumentsResponse> GetDocuments(string authToken, int limit, int offset)
         {
             try
             {
                 int numOfDays = int.Parse(_configuration["TeedySettings:DeleteCondition"]);
-                string _baseUrl = _configuration["Teedy:Credentials:URL"];
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
                 RestRequest _restRequest = new RestRequest($"/api/document/list", Method.Get);
 
                 _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
@@ -415,7 +427,7 @@ namespace TeedyPackage.Services.TeedyServices
                 _restRequest.AddParameter("limit", limit);
                 _restRequest.AddParameter("offset", offset);
                 _restRequest.AddParameter("search", $"after:{DateTime.Today.AddDays(-1 * numOfDays):yyyy-MM-dd}");
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
@@ -438,22 +450,20 @@ namespace TeedyPackage.Services.TeedyServices
             }
             catch (Exception ex)
             {
-                LogService.LogError("Failed to retrieve documents. " + ex.Message);
+                LogService.LogError("Failed to retrieve documents. " + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw new Exception("Failed to retrieve documents. " + ex.Message);
             }
         }
 
-        public static async Task<bool> DeleteDocument(string authToken, string documentId)
+        public async Task<bool> DeleteDocument(string authToken, string documentId)
         {
             try
             {
-                string _baseUrl = _configuration["Teedy:Credentials:URL"];
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
                 RestRequest _restRequest = new RestRequest($"/api/document/{documentId}", Method.Delete);
                 _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
                 _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
                 _restRequest.AddParameter("id", documentId);
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
                 {
@@ -479,22 +489,20 @@ namespace TeedyPackage.Services.TeedyServices
                 }
 
             }
-            catch
+            catch (Exception ex) 
             {
-                LogService.LogError("Failed to delete documents. " + documentId);
+                LogService.LogError("Failed to delete documents. " + documentId + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw;
             }
         }
-        
-        public static async Task<GetFiles> GetDocumentFiles(string authToken, string documentId)
+
+        public async Task<GetFiles> GetDocumentFiles(string authToken, string documentId)
         {
-            string _baseUrl = _configuration["Teedy:Credentials:URL"];
-            RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
             RestRequest _restRequest = new RestRequest($"/api/file/list", Method.Get);
             _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
             _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
             _restRequest.AddParameter("id", documentId);
-            RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+            RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
             if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
             {
                 try
@@ -515,17 +523,15 @@ namespace TeedyPackage.Services.TeedyServices
             }
         }
 
-        public static async Task<bool> DeleteFile(string authToken, string fileId)
+        public  async Task<bool> DeleteFile(string authToken, string fileId)
         {
             try
             {
-                string _baseUrl = _configuration["Teedy:Credentials:URL"];
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
                 RestRequest _restRequest = new RestRequest($"/api/file/{fileId}", Method.Delete);
                 _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
                 _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
                 _restRequest.AddParameter("id", fileId);
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
                 {
@@ -551,9 +557,9 @@ namespace TeedyPackage.Services.TeedyServices
                 }
 
             }
-            catch
+            catch(Exception ex)
             {
-                LogService.LogError("Failed to delete file. " + fileId);
+                LogService.LogError("Failed to delete file. " + fileId+ ex.Message + Environment.NewLine + ex.StackTrace);
                 throw;
             }
         }
@@ -569,7 +575,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public static async Task<string> CreateTag(CreateTag create, string authToken)
+        public async Task<string> CreateTag(CreateTag create, string authToken)
         {
             try
             {
@@ -592,11 +598,6 @@ namespace TeedyPackage.Services.TeedyServices
                     Console.WriteLine("Color must be a valid hexadecimal color code (e.g., #FF00FF or #F0F). Enter color as a code, not a name.");
                     throw new ArgumentException("Color must be a valid hexadecimal color code (e.g., #FF00FF or #F0F). Enter color as a code, not a name.");
                 }
-                // Set the base URL
-                var _baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                // Initialize RestClient
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
 
                 var endpointurl = _configuration["Teedy:Actions:AddTag"];
                 // Create the RestRequest for the PUT method
@@ -612,7 +613,7 @@ namespace TeedyPackage.Services.TeedyServices
                 if (!string.IsNullOrEmpty(create.ParentId))
                     _restRequest.AddParameter("parent", create.ParentId);
                 // Execute the request
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
                 {
@@ -634,13 +635,13 @@ namespace TeedyPackage.Services.TeedyServices
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                LogService.LogError( ex.Message + Environment.NewLine + ex.StackTrace);
                 throw new ApplicationException("An error occurred during Adding This Tag process.", ex);
 
             }
         }
 
-        public static async Task<Tag> GetTagById(string tagId, string authToken)
+        public async Task<Tag> GetTagById(string tagId, string authToken)
         {
             try
             {
@@ -649,12 +650,6 @@ namespace TeedyPackage.Services.TeedyServices
                     throw new ArgumentException("Tag ID cannot be null or empty.");
                 }
 
-                // Set the base URL
-                var baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                // Initialize RestClient
-                RestClient _restClient = new RestClient(new RestClientOptions(baseUrl));
-
                 var endpointUrl = $"{_configuration["Teedy:Actions:AddTag"]}/{tagId}";
                 RestRequest _restRequest = new RestRequest(endpointUrl, Method.Get);
 
@@ -662,7 +657,7 @@ namespace TeedyPackage.Services.TeedyServices
                 _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
 
                 // Execute the request
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
                 // Handle failure cases
                 if (!_restResponse.IsSuccessful)
@@ -703,7 +698,7 @@ namespace TeedyPackage.Services.TeedyServices
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                LogService.LogError(ex.Message + Environment.NewLine + ex.StackTrace);
                 throw new ApplicationException("An error occurred while retrieving the tag.", ex);
             }
         }
@@ -716,7 +711,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// <returns></returns>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ApplicationException"></exception>
-        public static async Task<Tag> GetTagByName(string name, string authToken)
+        public async Task<Tag> GetTagByName(string name, string authToken)
         {
             try
             {
@@ -735,7 +730,7 @@ namespace TeedyPackage.Services.TeedyServices
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                LogService.LogError("GetTagByName. " + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw new ApplicationException("An error occurred while retrieving the tag.", ex);
             }
         }
@@ -746,15 +741,10 @@ namespace TeedyPackage.Services.TeedyServices
         /// <param name="authToken"></param>
         /// <returns></returns>
         /// <exception cref="ApplicationException"></exception>
-        public static async Task<List<Tag>> GetAllTags(string authToken)
+        public  async Task<List<Tag>> GetAllTags(string authToken)
         {
             try
             {
-                // Set the base URL
-                var baseUrl = _configuration["Teedy:Credentials:URL"];
-
-                // Initialize RestClient
-                RestClient restClient = new RestClient(new RestClientOptions(baseUrl));
 
                 var endpointUrl = $"{_configuration["Teedy:Actions:AddTag"]}/list";
                 RestRequest restRequest = new RestRequest(endpointUrl, Method.Get);
@@ -763,7 +753,7 @@ namespace TeedyPackage.Services.TeedyServices
                 restRequest.AddHeader("Cookie", "auth_token=" + authToken);
 
                 // Execute the request
-                var restResponse = await restClient.ExecuteAsync(restRequest);
+                var restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(restRequest));
 
                 // Handle failure cases
                 if (!restResponse.IsSuccessful)
@@ -808,26 +798,23 @@ namespace TeedyPackage.Services.TeedyServices
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error: {ex.Message}");
+                LogService.LogError("GetAllTags "  + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw new ApplicationException("An error occurred while retrieving the tags.", ex);
             }
         }
 
 
-        public static async Task<bool> DeleteTag(string authToken, string tagId)
+        public async Task<bool> DeleteTag(string authToken, string tagId)
         {
             try
             {
-
-                string _baseUrl = _configuration["Teedy:Credentials:URL"];
-                RestClient _restClient = new RestClient(new RestClientOptions(_baseUrl));
                 RestRequest _restRequest = new RestRequest($"/api/tag/{tagId}", Method.Delete);
 
                 _restRequest.AddHeader("Cookie", "auth_token=" + authToken);
                 _restRequest.AddHeader("Content-Type", _configuration["Teedy:Headers:Content-Type"]);
 
                 _restRequest.AddParameter("id", tagId);
-                RestResponse _restResponse = await _restClient.ExecuteAsync(_restRequest);
+                RestResponse _restResponse = await _retryPolicy.ExecuteAsync(() => _client.ExecuteAsync(_restRequest));
 
 
                 if (_restResponse.IsSuccessful && !string.IsNullOrEmpty(_restResponse.Content))
@@ -852,8 +839,9 @@ namespace TeedyPackage.Services.TeedyServices
                     throw new Exception("Failed to delete tag. " + _restResponse.ErrorMessage);
                 }
             }
-            catch
+            catch(Exception ex) 
             {
+                LogService.LogError("DeleteTag " + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw;
             }
         }
@@ -865,7 +853,7 @@ namespace TeedyPackage.Services.TeedyServices
         /// </summary>
         /// <param name="fileName">The file name with extension</param>
         /// <returns>The appropriate MIME type</returns>
-        private static string GetMimeType(string fileName)
+        private  string GetMimeType(string fileName)
         {
             if (string.IsNullOrEmpty(fileName))
                 return "application/octet-stream";

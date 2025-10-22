@@ -12,7 +12,7 @@ namespace TeedyService
         private IConfiguration _configuration;
         private CancellationTokenSource tokenSource;
         private Task workerTask;
-
+        private TeedyApiMethods teedyApiMethods;
         public DeleteService()
         {
             _configuration = new ConfigurationBuilder()
@@ -20,6 +20,7 @@ namespace TeedyService
              .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
              .AddEnvironmentVariables()
              .Build();
+            teedyApiMethods= new TeedyApiMethods(_configuration);
         }
 
         public void Start()
@@ -71,7 +72,7 @@ namespace TeedyService
                 TeedyApiMethods apiMethods = new TeedyApiMethods(_configuration);
                 string teedyStorageFolderPath = _configuration["TeedySettings:StorageFolder"];
 
-                string authToken = await TeedyApiMethods.Login(_configuration["Teedy:Credentials:Username"], _configuration["Teedy:Credentials:Password"]);
+                string authToken = await teedyApiMethods.Login(_configuration["Teedy:Credentials:Username"], _configuration["Teedy:Credentials:Password"]);
                 if (authToken == default)
                 {
                     throw new Exception("Authentication failed. Please check your credentials.");
@@ -84,7 +85,7 @@ namespace TeedyService
                 List<(string docId, string docTitle, string docDescription, int rec_id)> documentsToUpdate = new List<(string, string, string, int)>();
                 do
                 {
-                    GetAllDocumentsResponse getAllDocumentsResponse = await TeedyApiMethods.GetDocuments(authToken, limit, offset);
+                    GetAllDocumentsResponse getAllDocumentsResponse = await teedyApiMethods.GetDocuments(authToken, limit, offset);
                     totalDocuments = getAllDocumentsResponse.total;
                     foreach (GetDocument document in getAllDocumentsResponse.documents)
                     {
@@ -93,16 +94,16 @@ namespace TeedyService
                             int rec_id = int.Parse(new string(document.title.Where(char.IsDigit).ToArray()));
                             foreach (Tag tag in document.tags)
                             {
-                                await TeedyApiMethods.DeleteTag(authToken, tag.Id);
+                                await teedyApiMethods.DeleteTag(authToken, tag.Id);
                             }
 
-                            GetFiles getFiles = await TeedyApiMethods.GetDocumentFiles(authToken, document.id);
+                            GetFiles getFiles = await teedyApiMethods.GetDocumentFiles(authToken, document.id);
                             foreach (TeedyPackage.Models.Files.File file in getFiles.files)
                             {
-                                await TeedyApiMethods.DeleteFile(authToken, file.id);
+                                await teedyApiMethods.DeleteFile(authToken, file.id);
                             }
 
-                            await TeedyApiMethods.DeleteDocument(authToken, document.id);
+                            await teedyApiMethods.DeleteDocument(authToken, document.id);
 
                             string recPath = Path.Combine(teedyStorageFolderPath, rec_id.ToString());
                             if (Directory.Exists(recPath))

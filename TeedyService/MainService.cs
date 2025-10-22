@@ -13,7 +13,7 @@ namespace TeedyService
         private IConfiguration _configuration;
         private CancellationTokenSource tokenSource;
         private Task workerTask;
-
+        private readonly TeedyApiMethods teedyApiMethods;
         public MainService()
         {
             _configuration = new ConfigurationBuilder()
@@ -21,6 +21,7 @@ namespace TeedyService
             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
             .AddEnvironmentVariables()
             .Build();
+            teedyApiMethods = new TeedyApiMethods(_configuration);
         }
         public void Start()
         {
@@ -132,16 +133,15 @@ namespace TeedyService
             }
         }
 
-        public static async Task<bool> UploadDocumentsToTeedy(IConfiguration configuration, List<string> filesPath, string rec_id, string receiptJsonFileContent)
+        public async Task<bool> UploadDocumentsToTeedy(IConfiguration configuration, List<string> filesPath, string rec_id, string receiptJsonFileContent)
         {
             try
             {
-                TeedyApiMethods apiMethods = new(configuration);
 
                 DbHelper dbHelper = new(configuration["connectionDefualt:connection"]);
 
                 #region Authnication
-                string authToken = await TeedyApiMethods.Login(configuration["Teedy:Credentials:Username"], configuration["Teedy:Credentials:Password"]);
+                string authToken = await teedyApiMethods.Login(configuration["Teedy:Credentials:Username"], configuration["Teedy:Credentials:Password"]);
                 if (authToken == default)
                 {
                     return false;
@@ -171,7 +171,7 @@ namespace TeedyService
 
                 #region Handle Create Or Modify Document In Teedy
 
-                if (!string.IsNullOrEmpty(helperData.First().rec_document_id) && (await TeedyApiMethods.GetDocument(helperData.First().rec_document_id, authToken))) // Recepit has valid document id
+                if (!string.IsNullOrEmpty(helperData.First().rec_document_id) && (await teedyApiMethods.GetDocument(helperData.First().rec_document_id, authToken))) // Recepit has valid document id
                 {
                     List<string> uploadedFilesId = await AddFilesToExistingDocument(authToken, filesPath, helperData.First().rec_document_id);
                     if (uploadedFilesId == null)
@@ -203,12 +203,12 @@ namespace TeedyService
             }
             catch (Exception ex)
             {
-                LogService.LogError($"Function: UploadDocumentsToTeedy , rec_id = {rec_id}" + ex.Message);
+                LogService.LogError($"Function: UploadDocumentsToTeedy , rec_id = {rec_id}" + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw;
             }
         }
 
-        public static async Task<List<string>> AddFilesToExistingDocument(string authToken, List<string> filesPath, string rec_document_id)
+        public  async Task<List<string>> AddFilesToExistingDocument(string authToken, List<string> filesPath, string rec_document_id)
         {
             try
             {
@@ -217,11 +217,11 @@ namespace TeedyService
                 bool isSucessAttachFiles = true;
                 foreach (string filePath in filesPath)
                 {
-                    string fileId = await TeedyApiMethods.PutFile(filePath, authToken);
+                    string fileId = await teedyApiMethods.PutFile(filePath, authToken);
                     LogService.LogInfo("Uploaded File Path: " + filePath);
                     uploadedFilesId.Add(fileId);
 
-                    bool? isSucess = await TeedyApiMethods.AttachFileToDoc(fileId, rec_document_id, authToken);
+                    bool? isSucess = await teedyApiMethods.AttachFileToDoc(fileId, rec_document_id, authToken);
                     LogService.LogInfo($"Attach File Path: {filePath} to Document Id: " + rec_document_id);
                     if (!isSucess.GetValueOrDefault())
                     {
@@ -237,12 +237,12 @@ namespace TeedyService
             }
             catch (Exception ex)
             {
-                LogService.LogError("Function: AddFilesToExistingDocument : " + ex.Message);
+                LogService.LogError("Function: AddFilesToExistingDocument : " + ex.Message + Environment.NewLine + ex.StackTrace);
                 throw;
             }
         }
 
-        public static async Task<AddDocumentWithFilesResponse> CreateNewDocumentAndAttachFiles(string authToken, List<string> tagsNamesFromAlmasryaForm, List<string> filesPath, string receiptJson, string rec_id)
+        public  async Task<AddDocumentWithFilesResponse> CreateNewDocumentAndAttachFiles(string authToken, List<string> tagsNamesFromAlmasryaForm, List<string> filesPath, string receiptJson, string rec_id)
         {
             try
             {
@@ -264,21 +264,21 @@ namespace TeedyService
                     }).ToList(),
                 };
 
-                AddDocumentWithFilesResponse addDocumentWithFiles = await TeedyApiMethods.AddFilesToDocument(document, filesPath, authToken);
+                AddDocumentWithFilesResponse addDocumentWithFiles = await teedyApiMethods.AddFilesToDocument(document, filesPath, authToken);
                 return addDocumentWithFiles;
             }
             catch(Exception ex)
             {
-                LogService.LogError("Function: CreateNewDocumentAndAttachFiles : " + ex.Message);
+                LogService.LogError("Function: CreateNewDocumentAndAttachFiles : " + ex.Message + Environment.NewLine + ex.StackTrace);
                 return new AddDocumentWithFilesResponse { IsSuccess = false, DocumentId = string.Empty, FileIds = new List<string>() };
             }
         }
 
-        private static async Task<List<string>> HandleCreateTages(string authToken, List<string> tagsNamesFromAlmasryaFormOrder)
+        private  async Task<List<string>> HandleCreateTages(string authToken, List<string> tagsNamesFromAlmasryaFormOrder)
         {
             try
             {
-                List<Tag> teedyExistTags = await TeedyApiMethods.GetAllTags(authToken);
+                List<Tag> teedyExistTags = await teedyApiMethods.GetAllTags(authToken);
                 List<(string tagId, string parentId)> tagsId = new List<(string, string)>();
 
                 #region Check Exists Almesrya Tags In Teedy
@@ -337,7 +337,7 @@ namespace TeedyService
                                 Color = "#008000",
                                 ParentId = i == 0 ? null : tagsId[i - 1].tagId
                             };
-                            string Id = await TeedyApiMethods.CreateTag(tag, authToken);
+                            string Id = await teedyApiMethods.CreateTag(tag, authToken);
                             tagsId[i] = (Id, tag.ParentId);
                         }
                         continue;
@@ -350,7 +350,7 @@ namespace TeedyService
                             Color = "#008000",
                             ParentId = i == 0 ? null : tagsId[i - 1].tagId
                         };
-                        string tagId = await TeedyApiMethods.CreateTag(createtag, authToken);
+                        string tagId = await teedyApiMethods.CreateTag(createtag, authToken);
                         tagsId[i] = (tagId, createtag.ParentId);
                     }
                 }
